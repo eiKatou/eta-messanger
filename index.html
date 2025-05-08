@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>帰宅時間連絡</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* フォントをInterに設定 */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+    <div class="bg-white p-6 rounded-lg shadow-md w-full max-w-sm text-center">
+        <h1 class="text-2xl font-bold mb-6 text-gray-800">帰宅時間連絡</h1>
+
+        <div class="mb-6">
+            <label for="arrival-time" class="block text-gray-700 text-sm font-medium mb-2">
+                帰宅予定時間を選択してください:
+            </label>
+            <select id="arrival-time" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline form-select">
+                </select>
+        </div>
+
+        <button id="share-line" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full">
+            LINEで連絡
+        </button>
+
+        <p id="message-preview" class="mt-4 text-gray-600 text-sm"></p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const arrivalTimeSelect = document.getElementById('arrival-time');
+            const shareLineButton = document.getElementById('share-line');
+            const messagePreview = document.getElementById('message-preview');
+
+            // 現在時刻から1時間後の時間を計算し、15分単位で丸める関数
+            function getInitialTime() {
+                const now = new Date();
+                const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000); // 1時間後
+
+                let minutes = oneHourLater.getMinutes();
+                const remainder = minutes % 15;
+
+                // 15分単位で丸める
+                if (remainder > 7) {
+                    minutes = minutes + (15 - remainder);
+                } else {
+                    minutes = minutes - remainder;
+                }
+
+                oneHourLater.setMinutes(minutes);
+                oneHourLater.setSeconds(0);
+                oneHourLater.setMilliseconds(0);
+
+                // 時刻をHH:MM形式で返す
+                const hours = oneHourLater.getHours().toString().padStart(2, '0');
+                const roundedMinutes = oneHourLater.getMinutes().toString().padStart(2, '0');
+
+                return `${hours}:${roundedMinutes}`;
+            }
+
+            // 15分刻みの時間オプションを生成する関数
+            function generateTimeOptions() {
+                const options = [];
+                const now = new Date();
+                const initialTime = new Date(now.getTime() + 60 * 60 * 1000); // 現在時刻から1時間後を基準に開始
+
+                // 開始時刻を15分単位に丸める
+                let startMinutes = initialTime.getMinutes();
+                const startRemainder = startMinutes % 15;
+                 if (startRemainder > 7) {
+                    startMinutes = startMinutes + (15 - startRemainder);
+                } else {
+                    startMinutes = startMinutes - startRemainder;
+                }
+                initialTime.setMinutes(startMinutes);
+                initialTime.setSeconds(0);
+                initialTime.setMilliseconds(0);
+
+
+                // 開始時刻から約3時間後までオプションを生成
+                const endTime = new Date(initialTime.getTime() + 3 * 60 * 60 * 1000);
+
+                let currentTime = new Date(initialTime);
+
+                while (currentTime <= endTime) {
+                    const hours = currentTime.getHours().toString().padStart(2, '0');
+                    const minutes = currentTime.getMinutes().toString().padStart(2, '0');
+                    const timeString = `${hours}:${minutes}`;
+                    options.push(timeString);
+
+                    // 15分進める
+                    currentTime.setTime(currentTime.getTime() + 15 * 60 * 1000);
+                }
+
+                return options;
+            }
+
+            // 時間オプションをドロップダウンに追加
+            const timeOptions = generateTimeOptions();
+            timeOptions.forEach(time => {
+                const option = document.createElement('option');
+                option.value = time;
+                option.textContent = time;
+                arrivalTimeSelect.appendChild(option);
+            });
+
+            // 初期表示時間を設定
+            const initialRoundedTime = getInitialTime();
+            arrivalTimeSelect.value = initialRoundedTime;
+
+            // メッセージプレビューを更新する関数
+            function updateMessagePreview() {
+                const selectedTime = arrivalTimeSelect.value;
+                messagePreview.textContent = `メッセージプレビュー: 今から帰ります。${selectedTime}に家につきます。`;
+            }
+
+            // 初期メッセージプレビューを表示
+            updateMessagePreview();
+
+            // 選択時間が変更されたらメッセージプレビューを更新
+            arrivalTimeSelect.addEventListener('change', updateMessagePreview);
+
+            // LINEで共有ボタンのイベントリスナー
+            shareLineButton.addEventListener('click', () => {
+                const selectedTime = arrivalTimeSelect.value;
+                const message = `今から帰ります。${selectedTime}に家につきます。`;
+                const encodedMessage = encodeURIComponent(message);
+                // LINEの共有URLスキーム
+                const lineShareUrl = `https://lineit.line.me/share/text?text=${encodedMessage}`;
+
+                // 新しいウィンドウまたはタブでLINEを開く
+                window.open(lineShareUrl, '_blank');
+            });
+        });
+    </script>
+</body>
+</html>
