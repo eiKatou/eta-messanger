@@ -130,8 +130,9 @@
                 const selectedTime = arrivalTimeSelect.value;
                 const message = `今から帰ります。${selectedTime}に家につきます。`;
                 const encodedMessage = encodeURIComponent(message);
-                // LINEの共有URLスキーム
-                const lineShareUrl = `https://lineit.line.me/share/text?text=${encodedMessage}`;
+
+                // LINEの共有URLスキームを https://line.me/R/share?text= に変更
+                const lineShareUrl = `https://line.me/R/share?text=${encodedMessage}`;
 
                 // 新しいウィンドウまたはタブでLINEを開く
                 window.open(lineShareUrl, '_blank');
