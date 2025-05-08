@@ -10,11 +10,42 @@
         body {
             font-family: 'Inter', sans-serif;
         }
+        /* 矢印の回転アニメーション */
+        .rotate-180 {
+            transform: rotate(180deg);
+        }
+        .transition-transform {
+            transition-property: transform;
+            transition-duration: 150ms;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        }
     </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
     <div class="bg-white p-6 rounded-lg shadow-md w-full max-w-sm text-center">
         <h1 class="text-2xl font-bold mb-6 text-gray-800">帰宅時間連絡</h1>
+
+        <div class="mb-6 border p-4 rounded-md bg-gray-50">
+            <div id="settings-header" class="flex justify-between items-center cursor-pointer mb-3">
+                <h2 class="text-lg font-semibold text-gray-700">初期表示時間設定</h2>
+                <svg id="toggle-icon" class="w-5 h-5 text-gray-700 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </div>
+
+            <div id="settings-content" class="hidden">
+                <div class="flex justify-center items-center space-x-2 mb-4">
+                    <input type="number" id="initial-hours" class="shadow appearance-none border rounded w-16 py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline text-center" min="0" value="1">
+                    <label for="initial-hours" class="text-gray-700">時間</label>
+                    <input type="number" id="initial-minutes" class="shadow appearance-none border rounded w-16 py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline text-center" min="0" step="15" value="0">
+                    <label for="initial-minutes" class="text-gray-700">分後</label>
+                </div>
+                <button id="save-settings" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full">
+                    設定を保存
+                </button>
+                <p id="save-status" class="mt-2 text-sm text-gray-600"></p>
+            </div>
+        </div>
 
         <div class="mb-6">
             <label for="arrival-time" class="block text-gray-700 text-sm font-medium mb-2">
@@ -36,13 +67,62 @@
             const arrivalTimeSelect = document.getElementById('arrival-time');
             const shareLineButton = document.getElementById('share-line');
             const messagePreview = document.getElementById('message-preview');
+            const initialHoursInput = document.getElementById('initial-hours');
+            const initialMinutesInput = document.getElementById('initial-minutes');
+            const saveSettingsButton = document.getElementById('save-settings');
+            const saveStatus = document.getElementById('save-status');
 
-            // 現在時刻から1時間後の時間を計算し、15分単位で丸める関数
-            function getInitialTime() {
+            // 設定折りたたみ機能に関連する要素
+            const settingsHeader = document.getElementById('settings-header');
+            const settingsContent = document.getElementById('settings-content');
+            const toggleIcon = document.getElementById('toggle-icon');
+
+            // 設定内容の表示/非表示を切り替える関数
+            function toggleSettings() {
+                settingsContent.classList.toggle('hidden');
+                toggleIcon.classList.toggle('rotate-180'); // 矢印を回転させる
+            }
+
+            // 設定ヘッダーにクリックイベントリスナーを追加
+            settingsHeader.addEventListener('click', toggleSettings);
+
+            // 設定をlocalStorageから読み込む
+            function loadSettings() {
+                const savedHours = localStorage.getItem('initialHours');
+                const savedMinutes = localStorage.getItem('initialMinutes');
+
+                if (savedHours !== null) {
+                    initialHoursInput.value = savedHours;
+                }
+                if (savedMinutes !== null) {
+                    initialMinutesInput.value = savedMinutes;
+                }
+            }
+
+            // 設定をlocalStorageに保存する
+            function saveSettings() {
+                const hours = initialHoursInput.value;
+                const minutes = initialMinutesInput.value;
+
+                localStorage.setItem('initialHours', hours);
+                localStorage.setItem('initialMinutes', minutes);
+
+                saveStatus.textContent = '設定を保存しました！';
+                saveStatus.style.color = 'green';
+                setTimeout(() => {
+                    saveStatus.textContent = '';
+                }, 3000); // 3秒後にメッセージを消す
+            }
+
+            // 設定保存ボタンのイベントリスナー
+            saveSettingsButton.addEventListener('click', saveSettings);
+
+            // 現在時刻から指定された時間・分後の時間を計算し、15分単位で丸める関数
+            function getInitialTime(hoursLater, minutesLater) {
                 const now = new Date();
-                const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000); // 1時間後
+                const initialOffsetTime = new Date(now.getTime() + hoursLater * 60 * 60 * 1000 + minutesLater * 60 * 1000); // 指定された時間・分後
 
-                let minutes = oneHourLater.getMinutes();
+                let minutes = initialOffsetTime.getMinutes();
                 const remainder = minutes % 15;
 
                 // 15分単位で丸める
@@ -52,22 +132,23 @@
                     minutes = minutes - remainder;
                 }
 
-                oneHourLater.setMinutes(minutes);
-                oneHourLater.setSeconds(0);
-                oneHourLater.setMilliseconds(0);
+                initialOffsetTime.setMinutes(minutes);
+                initialOffsetTime.setSeconds(0);
+                initialOffsetTime.setMilliseconds(0);
 
                 // 時刻をHH:MM形式で返す
-                const hours = oneHourLater.getHours().toString().padStart(2, '0');
-                const roundedMinutes = oneHourLater.getMinutes().toString().padStart(2, '0');
+                const hours = initialOffsetTime.getHours().toString().padStart(2, '0');
+                const roundedMinutes = initialOffsetTime.getMinutes().toString().padStart(2, '0');
 
                 return `${hours}:${roundedMinutes}`;
             }
 
             // 15分刻みの時間オプションを生成する関数
-            function generateTimeOptions() {
+            function generateTimeOptions(initialHours, initialMinutes) {
                 const options = [];
                 const now = new Date();
-                const initialTime = new Date(now.getTime() + 60 * 60 * 1000); // 現在時刻から1時間後を基準に開始
+                // 指定された時間・分後を基準に開始
+                const initialTime = new Date(now.getTime() + initialHours * 60 * 60 * 1000 + initialMinutes * 60 * 1000);
 
                 // 開始時刻を15分単位に丸める
                 let startMinutes = initialTime.getMinutes();
@@ -80,7 +161,6 @@
                 initialTime.setMinutes(startMinutes);
                 initialTime.setSeconds(0);
                 initialTime.setMilliseconds(0);
-
 
                 // 開始時刻から約3時間後までオプションを生成
                 const endTime = new Date(initialTime.getTime() + 3 * 60 * 60 * 1000);
@@ -100,8 +180,17 @@
                 return options;
             }
 
-            // 時間オプションをドロップダウンに追加
-            const timeOptions = generateTimeOptions();
+            // ページロード時に設定を読み込む
+            loadSettings();
+
+            // 読み込んだ設定に基づいて初期表示時間を計算し、オプションを生成・設定
+            const initialHours = parseInt(initialHoursInput.value) || 1; // 設定がない場合はデフォルト1時間
+            const initialMinutes = parseInt(initialMinutesInput.value) || 0; // 設定がない場合はデフォルト0分
+
+            const timeOptions = generateTimeOptions(initialHours, initialMinutes);
+
+            // 既存のオプションをクリア
+            arrivalTimeSelect.innerHTML = '';
             timeOptions.forEach(time => {
                 const option = document.createElement('option');
                 option.value = time;
@@ -110,8 +199,9 @@
             });
 
             // 初期表示時間を設定
-            const initialRoundedTime = getInitialTime();
+            const initialRoundedTime = getInitialTime(initialHours, initialMinutes);
             arrivalTimeSelect.value = initialRoundedTime;
+
 
             // メッセージプレビューを更新する関数
             function updateMessagePreview() {
@@ -131,7 +221,7 @@
                 const message = `今から帰ります。${selectedTime}に家につきます。`;
                 const encodedMessage = encodeURIComponent(message);
 
-                // LINEの共有URLスキームを https://line.me/R/share?text= に変更
+                // LINEの共有URLスキーム
                 const lineShareUrl = `https://line.me/R/share?text=${encodedMessage}`;
 
                 // 新しいウィンドウまたはタブでLINEを開く
