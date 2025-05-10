@@ -51,8 +51,12 @@
             <label for="arrival-time" class="block text-gray-700 text-sm font-medium mb-2">
                 帰宅予定時間を選択してください:
             </label>
-            <select id="arrival-time" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline form-select">
+            <div class="flex items-center space-x-2">
+                <button id="decrease-time" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">-15分</button>
+                <select id="arrival-time" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline form-select">
                 </select>
+                <button id="increase-time" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">+15分</button>
+            </div>
         </div>
 
         <button id="share-line" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full">
@@ -143,29 +147,25 @@
                 return `${hours}:${roundedMinutes}`;
             }
 
-            // 15分刻みの時間オプションを生成する関数
-            function generateTimeOptions(initialHours, initialMinutes) {
+            // 15分刻みの時間オプションを生成する関数（現在時刻から開始）
+            function generateTimeOptions() {
                 const options = [];
                 const now = new Date();
-                // 指定された時間・分後を基準に開始
-                const initialTime = new Date(now.getTime() + initialHours * 60 * 60 * 1000 + initialMinutes * 60 * 1000);
 
-                // 開始時刻を15分単位に丸める
-                let startMinutes = initialTime.getMinutes();
-                const startRemainder = startMinutes % 15;
-                 if (startRemainder > 7) {
-                    startMinutes = startMinutes + (15 - startRemainder);
-                } else {
-                    startMinutes = startMinutes - startRemainder;
+                // 現在時刻を15分単位に丸める
+                let currentMinutes = now.getMinutes();
+                const remainder = currentMinutes % 15;
+                if (remainder > 0) { // 0分でない場合のみ切り上げ
+                     currentMinutes = currentMinutes + (15 - remainder);
                 }
-                initialTime.setMinutes(startMinutes);
-                initialTime.setSeconds(0);
-                initialTime.setMilliseconds(0);
+                now.setMinutes(currentMinutes);
+                now.setSeconds(0);
+                now.setMilliseconds(0);
 
-                // 開始時刻から約3時間後までオプションを生成
-                const endTime = new Date(initialTime.getTime() + 3 * 60 * 60 * 1000);
+                // 現在時刻から約3時間後までオプションを生成
+                const endTime = new Date(now.getTime() + 3 * 60 * 60 * 1000);
 
-                let currentTime = new Date(initialTime);
+                let currentTime = new Date(now);
 
                 while (currentTime <= endTime) {
                     const hours = currentTime.getHours().toString().padStart(2, '0');
@@ -183,11 +183,8 @@
             // ページロード時に設定を読み込む
             loadSettings();
 
-            // 読み込んだ設定に基づいて初期表示時間を計算し、オプションを生成・設定
-            const initialHours = parseInt(initialHoursInput.value) || 1; // 設定がない場合はデフォルト1時間
-            const initialMinutes = parseInt(initialMinutesInput.value) || 0; // 設定がない場合はデフォルト0分
-
-            const timeOptions = generateTimeOptions(initialHours, initialMinutes);
+            // オプションを生成・設定
+            const timeOptions = generateTimeOptions();
 
             // 既存のオプションをクリア
             arrivalTimeSelect.innerHTML = '';
@@ -198,7 +195,9 @@
                 arrivalTimeSelect.appendChild(option);
             });
 
-            // 初期表示時間を設定
+            // 読み込んだ設定に基づいて初期表示時間を計算し、設定
+            const initialHours = parseInt(initialHoursInput.value) || 1; // 設定がない場合はデフォルト1時間
+            const initialMinutes = parseInt(initialMinutesInput.value) || 0; // 設定がない場合はデフォルト0分
             const initialRoundedTime = getInitialTime(initialHours, initialMinutes);
             arrivalTimeSelect.value = initialRoundedTime;
 
@@ -214,6 +213,66 @@
 
             // 選択時間が変更されたらメッセージプレビューを更新
             arrivalTimeSelect.addEventListener('change', updateMessagePreview);
+
+            // 時間調整ボタンのイベントリスナー
+            const decreaseTimeButton = document.getElementById('decrease-time');
+            const increaseTimeButton = document.getElementById('increase-time');
+
+            decreaseTimeButton.addEventListener('click', () => {
+                adjustTime(-15);
+            });
+
+            increaseTimeButton.addEventListener('click', () => {
+                adjustTime(15);
+            });
+
+            // 時間を調整する関数
+            function adjustTime(minutes) {
+                const selectedTime = arrivalTimeSelect.value;
+                const [hours, mins] = selectedTime.split(':').map(Number);
+                const now = new Date();
+                // 今日の日付と選択された時間でDateオブジェクトを作成
+                const selectedDateTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, mins);
+
+                // 時間を調整
+                selectedDateTime.setTime(selectedDateTime.getTime() + minutes * 60 * 1000);
+
+                // 調整後の時間をHH:MM形式に戻す
+                const adjustedHours = selectedDateTime.getHours().toString().padStart(2, '0');
+                const adjustedMinutes = selectedDateTime.getMinutes().toString().padStart(2, '0');
+                const adjustedTimeString = `${adjustedHours}:${adjustedMinutes}`;
+
+                // 調整後の時間をselect要素に設定
+                // オプションに存在しない時間になる可能性もあるため、最も近い既存のオプションを選択する
+                let selectedIndex = -1;
+                let minDiff = Infinity;
+
+                for (let i = 0; i < arrivalTimeSelect.options.length; i++) {
+                    const optionTime = arrivalTimeSelect.options[i].value;
+                    const [optionHours, optionMins] = optionTime.split(':').map(Number);
+                    const optionDateTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), optionHours, optionMins);
+
+                    const diff = Math.abs(selectedDateTime.getTime() - optionDateTime.getTime());
+
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        selectedIndex = i;
+                    }
+                }
+
+                if (selectedIndex !== -1) {
+                    arrivalTimeSelect.selectedIndex = selectedIndex;
+                } else {
+                    // 最も近いオプションが見つからなかった場合（通常は発生しないはずだが念のため）
+                    // 最初のオプションを選択
+                    arrivalTimeSelect.selectedIndex = 0;
+                }
+
+
+                // メッセージプレビューを更新
+                updateMessagePreview();
+            }
+
 
             // LINEで共有ボタンのイベントリスナー
             shareLineButton.addEventListener('click', () => {
